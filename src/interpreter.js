@@ -1,4 +1,3 @@
-
 var Interpreter = function () {
     var statements;
     var rules;
@@ -16,6 +15,16 @@ var Interpreter = function () {
       this.setStatements(database);
       this.setRelations();
       this.setRules(database);
+      this.setRulesRelations()
+    }
+
+    this.setRulesRelations = function(){
+      let i;
+      let name = 0;
+      for(i = 0; i < this.rules.length; i++){
+        let rule_header = this.rules[i][0].split(/[(,)]/)
+        this.rules[i] = new Rule(rule_header[name],this.filterEmptyStrings(rule_header.splice(1)),this.rules[i][1].split("|"))
+      }
     }
 
     this.checkQuery = function(query){
@@ -27,6 +36,33 @@ var Interpreter = function () {
       }
     }
 
+    this.verificateRule = function(query){
+      var rule = this.getMatchingRule(query)
+      let i;
+      let j;
+      for(i = 0; i<rule.conditions.length; i++){
+        let condition_checked = rule.conditions[i]
+        for(j = 0; j<rule.params_format.length; j++){
+          let subject = rule.params_format[j];
+          condition_checked = condition_checked.replace(subject,query.params[j])
+        }
+        if(!this.verificateStatement(this.parseQuery(condition_checked))){
+            return false;
+        }
+      }
+      return true;
+    }
+
+    this.getMatchingRule = function(query){
+      let i;
+      for(i = 0; i<this.rules.length; i++){
+        if(this.rules[i].name == query.name
+        && this.rules[i].params_format.length == query.params.length){
+          return this.rules[i]
+        }
+      }
+      throw new Error('No matching Rule')
+    }
     this.verificateStatement = function(query){
       let i;
       for(i = 0; i < this.statements.length; i++){

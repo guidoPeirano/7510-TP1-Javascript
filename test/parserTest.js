@@ -470,3 +470,74 @@ describe("Statement Query Verification Functions",function(){
   });
 
 })
+
+describe("Rule Relation Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var rule_1_information = ["hijo",["X","Y"],["varon(X)", "padre(Y,X)"]]
+  var rule_2_information = ["hija",["X","Y"],["mujer(X)", "padre(Y,X)"]]
+  let name = 0;
+  let subject = 1;
+  let conditions = 2;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setRules(statement_db1);
+      interpreter.setRulesRelations();
+  });
+  it("Rule 1 relation es created correctly", function(){
+    assert(interpreter.rules[0].name == rule_1_information[name]
+      && interpreter.arraysAreEqual(interpreter.rules[0].params_format,rule_1_information[subject])
+      && interpreter.arraysAreEqual(interpreter.rules[0].conditions,rule_1_information[conditions]))
+  });
+  it("Rule 2 relation es created correctly", function(){
+    assert(interpreter.rules[1].name == rule_2_information[name]
+      && interpreter.arraysAreEqual(interpreter.rules[1].params_format,rule_2_information[subject])
+      && interpreter.arraysAreEqual(interpreter.rules[1].conditions,rule_2_information[conditions]))
+  });
+})
+
+describe("Rule Relation Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var rule_1_information = ["hijo",["X","Y"],["varon(X)", "padre(Y,X)"]]
+  var rule_2_information = ["hija",["X","Y"],["mujer(X)", "padre(Y,X)"]]
+  var raw_query_2 = "hija(roberto, cecilia)"
+  var raw_query_1 = "hijo(roberto, juan)"
+  var rule_match_query_1;
+  var rule_match_query_2;
+  let name = 0;
+  let subject = 1;
+  let conditions = 2;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setRules(statement_db1);
+      interpreter.setRulesRelations();
+      rule_match_query_1 = interpreter.getMatchingRule(interpreter.parseQuery(raw_query_1));
+      rule_match_query_2 = interpreter.getMatchingRule(interpreter.parseQuery(raw_query_2));
+
+  });
+  it("Rule 1 relation es created correctly", function(){
+    assert(rule_match_query_1.name == rule_1_information[name]
+      && interpreter.arraysAreEqual(rule_match_query_1.params_format,rule_1_information[subject])
+      && interpreter.arraysAreEqual(rule_match_query_1.conditions,rule_1_information[conditions]))
+  });
+  it("Rule 2 relation es created correctly", function(){
+    assert(rule_match_query_2.name == rule_2_information[name]
+      && interpreter.arraysAreEqual(rule_match_query_2.params_format,rule_2_information[subject])
+      && interpreter.arraysAreEqual(rule_match_query_2.conditions,rule_2_information[conditions]))
+  });
+})
