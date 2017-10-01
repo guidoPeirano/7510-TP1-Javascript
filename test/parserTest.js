@@ -93,17 +93,29 @@ describe("Rule Format Functions", function(){
       // runs before each test in this block
       interpreter = new Interpreter();
   });
+  var rules = [
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var parsed_rules = [
+      ["hijo(X,Y)", "varon(X)|padre(Y,X)"],
+      ["hija(X,Y)", "mujer(X)|padre(Y,X)"]
+  ];
   var rule =
-      "hija(X, Y) :- mujer(X), padre(Y, X).";
-  var parsed_rule = ["hija(X,Y)","mujer(X),padre(Y,X)"]
+      "hija(X,Y):-mujer(X),padre(Y,X)";
+  var parsed_rule = [ 'hija(X,Y)', 'mujer(X),padre(Y,X)' ];
+  var separated_conditions = 'mujer(X)|padre(Y,X)'
 
   it("Sentence's spaces are deleted",function(){
     assert(interpreter.removeSpaces("sentence with spaces")=="sentencewithspaces");
   });
   it("Rule is splited in rule and conditions",function(){
-    assert(interpreter.parseConditions(rule)==parsed_rule);
+    assert(interpreter.parseConditions(rule).equals(parsed_rule));
   });
   it("Conditions are separated by the established separator",function(){
-
+    assert(interpreter.insertConditionDivider(parsed_rule[1])==separated_conditions);
   });
+  it("Rules get parsed correctly", function(){
+    assert(interpreter.parseRules(rules).equals(parsed_rules));
+  })
 });
