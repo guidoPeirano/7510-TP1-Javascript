@@ -46,7 +46,7 @@ describe("Statement Parser", function(){
 
 
   it('Statement parser parses a health db',function(){
-    assert(interpreter.parseStatements(statement_db),parsed_statement_db)
+    assert(interpreter.arraysAreEqual(interpreter.parseStatements(statement_db),parsed_statement_db))
   });
   it('Statement parser should fail w/unhealthy_statement_db', function(){
     expect(() => interpreter.parseStatements(unhealthy_statement_db)).to.throw(Error);
@@ -110,12 +110,363 @@ describe("Rule Format Functions", function(){
     assert(interpreter.removeSpaces("sentence with spaces")=="sentencewithspaces");
   });
   it("Rule is splited in rule and conditions",function(){
-    assert(interpreter.parseConditions(rule).equals(parsed_rule));
+    assert(interpreter.arraysAreEqual(interpreter.parseConditions(rule),parsed_rule));
   });
   it("Conditions are separated by the established separator",function(){
     assert(interpreter.insertConditionDivider(parsed_rule[1])==separated_conditions);
   });
   it("Rules get parsed correctly", function(){
-    assert(interpreter.parseRules(rules).equals(parsed_rules));
+    assert(interpreter.arraysAreEqual(interpreter.parseRules(rules),parsed_rules));
   })
 });
+
+describe("Database State Checker", function(){
+  var interpreter = null;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+  });
+  var broken_db = [
+      "varon(juan).",
+      "varon("
+  ];
+ let incomplete_statement = 1;
+  var lastname_db = [
+      "varon(juan).",
+      "varon(pepe sanchez).",
+      "varon(hector).",
+  ];
+  var conditionless_db = [
+      "varon(juan).",
+      "varon(pepe).",
+      "hijo(X, Y) :- .",
+      "hija(X, Y) :- ."
+  ];
+  var healthy_db = [
+      "varon(juan).",
+      "varon(pepe).",
+      "varon(hector).",
+      "varon(roberto).",
+      "varon(alejandro).",
+      "mujer(maria).",
+      "mujer(cecilia).",
+      "padre(juan, pepe).",
+      "padre(juan, pepa).",
+      "padre(hector, maria).",
+      "padre(roberto, alejandro).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+
+  it("Broken database is detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(broken_db)).to.throw(Error);
+  });
+  it("Last name in database is detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(lastname_db)).to.throw(Error);
+  });
+  it("Rule without conditions detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(conditionless_db)).to.throw(Error);
+  });
+  it("Healthy database is run, no problems",function(){
+      assert(interpreter.checkDatabaseHealth(healthy_db))
+  });
+});
+
+describe("Query Format Functions", function(){
+  var interpreter = null;
+
+
+
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+  });
+  var incomplete_query = "varon(pe"
+  var giberish_query = "varon[asd]"
+  it("Incomplete query is detected and an Error is thrown", function(){
+    expect(() => interpreter.checkQueryHealth(incomplete_query)).to.throw(Error);
+  });
+  it("Giberish query is detected and an Error is thrown", function(){
+    expect(() => interpreter.checkQueryHealth(giberish_query)).to.throw(Error);
+  });
+});
+
+describe("Databas Parsing Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var parsed_statements = [
+      ["varon", "juan"],
+      ["padre", "roberto", "cecilia"]
+  ];
+  var parsed_rules = [
+      ["hijo(X,Y)", "varon(X)|padre(Y,X)"],
+      ["hija(X,Y)", "mujer(X)|padre(Y,X)"]
+  ];
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRules(statement_db1);
+  });
+  it("Statements parsed correctly", function(){
+    assert(interpreter.arraysAreEqual(interpreter.statements,parsed_statements))
+  });
+  it("Rules parsed correctly", function(){
+    assert(interpreter.arraysAreEqual(interpreter.rules,parsed_rules))
+  });
+})
+
+describe("Database Setting Relation Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var relation_format_statements = [
+      ["varon", ["juan"]],
+      ["padre", ["roberto", "cecilia"]]
+  ];
+  let name = 0;
+  let params = 1;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRelations();
+  });
+  it("Relation with one param created correctly", function(){
+    assert(interpreter.statements[0].name == relation_format_statements[0][name]
+    && interpreter.arraysAreEqual(interpreter.statements[0].params,relation_format_statements[0][params]))
+  });
+  it("Relation with more than one param created correctly", function(){
+    assert(interpreter.statements[1].name == relation_format_statements[1][name]
+    && interpreter.arraysAreEqual(interpreter.statements[1].params,relation_format_statements[1][params]))
+  });
+})
+
+describe("Query Processing Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var raw_query_1 = "varon(juan)";
+  var raw_query_2 = "padre(roberto, cecilia)";
+  var raw_rule_query = "hijo(roberto, cecilia)"
+  var parsed_query_1_information = ["varon", ["juan"]]
+  var parsed_query_2_information = ["padre", ["roberto", "cecilia"]]
+  var parsed_query_1;
+  var parsed_query_2;
+  var parsed_rule_query;
+  let name = 0;
+  let params = 1;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRelations();
+      parsed_query_1 = interpreter.parseQuery(raw_query_1);
+      parsed_query_2 = interpreter.parseQuery(raw_query_2);
+      parsed_rule_query = interpreter.parseQuery(raw_rule_query);
+  });
+  it("Statement Query with one parameter is processed correctly", function(){
+    assert(interpreter.parseQuery(raw_query_1).name = parsed_query_1_information[name]
+    && interpreter.arraysAreEqual(interpreter.parseQuery(raw_query_1).params,parsed_query_1_information[params]))
+  });
+  it("Statement Query with more than one parameter is processed correctly", function(){
+    assert(interpreter.parseQuery(raw_query_2).name = parsed_query_2_information[name]
+    && interpreter.arraysAreEqual(interpreter.parseQuery(raw_query_2).params,parsed_query_2_information[params]))
+  });
+  it("Statement Query with one parameter is processed correctly as statement", function(){
+    assert(interpreter.queryIsStatement(parsed_query_1))
+  });
+  it("Statement Query with more than one parameter is processed correctly as statement", function(){
+    assert(interpreter.queryIsStatement(parsed_query_2))
+  });
+  it("Rule Query is correctly detected as rule", function(){
+    assert(interpreter.queryIsStatement(parsed_rule_query)==false)
+  });
+})
+
+describe("Database State Checker", function(){
+  var interpreter = null;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+  });
+  var broken_db = [
+      "varon(juan).",
+      "varon("
+  ];
+ let incomplete_statement = 1;
+  var lastname_db = [
+      "varon(juan).",
+      "varon(pepe sanchez).",
+      "varon(hector).",
+  ];
+  var conditionless_db = [
+      "varon(juan).",
+      "varon(pepe).",
+      "hijo(X, Y) :- .",
+      "hija(X, Y) :- ."
+  ];
+  var healthy_db = [
+      "varon(juan).",
+      "varon(pepe).",
+      "varon(hector).",
+      "varon(roberto).",
+      "varon(alejandro).",
+      "mujer(maria).",
+      "mujer(cecilia).",
+      "padre(juan, pepe).",
+      "padre(juan, pepa).",
+      "padre(hector, maria).",
+      "padre(roberto, alejandro).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+
+  it("Broken database is detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(broken_db)).to.throw(Error);
+  });
+  it("Last name in database is detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(lastname_db)).to.throw(Error);
+  });
+  it("Rule without conditions detected and Error is thrown",function(){
+      expect(() => interpreter.checkDatabaseHealth(conditionless_db)).to.throw(Error);
+  });
+  it("Healthy database is run, no problems",function(){
+      assert(interpreter.checkDatabaseHealth(healthy_db))
+  });
+});
+
+describe("Query Format Functions", function(){
+  var interpreter = null;
+
+
+
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+  });
+  var incomplete_query = "varon(pe"
+  var giberish_query = "varon[asd]"
+  it("Incomplete query is detected and an Error is thrown", function(){
+    expect(() => interpreter.checkQueryHealth(incomplete_query)).to.throw(Error);
+  });
+  it("Giberish query is detected and an Error is thrown", function(){
+    expect(() => interpreter.checkQueryHealth(giberish_query)).to.throw(Error);
+  });
+});
+
+describe("Databas Parsing Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var parsed_statements = [
+      ["varon", "juan"],
+      ["padre", "roberto", "cecilia"]
+  ];
+  var parsed_rules = [
+      ["hijo(X,Y)", "varon(X)|padre(Y,X)"],
+      ["hija(X,Y)", "mujer(X)|padre(Y,X)"]
+  ];
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRules(statement_db1);
+  });
+  it("Statements parsed correctly", function(){
+    assert(interpreter.arraysAreEqual(interpreter.statements,parsed_statements))
+  });
+  it("Rules parsed correctly", function(){
+    assert(interpreter.arraysAreEqual(interpreter.rules,parsed_rules))
+  });
+})
+
+describe("Database Setting Relation Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var relation_format_statements = [
+      ["varon", ["juan"]],
+      ["padre", ["roberto", "cecilia"]]
+  ];
+  let name = 0;
+  let params = 1;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRelations();
+  });
+  it("Relation with one param created correctly", function(){
+    assert(interpreter.statements[0].name == relation_format_statements[0][name]
+    && interpreter.arraysAreEqual(interpreter.statements[0].params,relation_format_statements[0][params]))
+  });
+  it("Relation with more than one param created correctly", function(){
+    assert(interpreter.statements[1].name == relation_format_statements[1][name]
+    && interpreter.arraysAreEqual(interpreter.statements[1].params,relation_format_statements[1][params]))
+  });
+})
+
+describe("Statement Query Verification Functions",function(){
+  var interpreter = null;
+
+  var statement_db1 = [
+      "varon(juan).",
+      "padre(roberto, cecilia).",
+      "hijo(X, Y) :- varon(X), padre(Y, X).",
+      "hija(X, Y) :- mujer(X), padre(Y, X)."
+  ];
+  var raw_query_1 = "varon(juan)";
+  var raw_query_2 = "padre(roberto, cecilia)";
+  var raw_query_3 = "padre(roberto, maria)";
+  var parsed_query_1;
+  var parsed_query_2;
+  var parsed_false_query;
+  beforeEach(function () {
+      // runs before each test in this block
+      interpreter = new Interpreter();
+      interpreter.setStatements(statement_db1);
+      interpreter.setRelations();
+      parsed_query_1 = interpreter.parseQuery(raw_query_1);
+      parsed_query_2 = interpreter.parseQuery(raw_query_2);
+      parsed_false_query = interpreter.parseQuery(raw_query_3);
+  });
+  it("Statement Query with one parameter is verificated correctly", function(){
+    assert(interpreter.verificateStatement(parsed_query_1))
+  });
+  it("Statement Query with more than one parameter is verificated correctly", function(){
+    assert(interpreter.verificateStatement(parsed_query_2))
+  });
+  it("False Statement Query is verificated correctly as false", function(){
+    assert(interpreter.verificateStatement(parsed_false_query)==false)
+  });
+
+})

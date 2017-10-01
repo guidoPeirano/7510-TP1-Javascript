@@ -1,12 +1,139 @@
+
 var Interpreter = function () {
-
-    this.parseDB = function (params, paramss, paramsss) {
-
+    var statements;
+    var rules;
+    function Relation(name,params){
+      this.name = name;
+      this.params = params;
+    }
+    function Rule(name, params_format, conditions){
+      this.name = name;
+      this.params_format = params_format;
+      this.conditions = conditions
+    }
+    this.parseDB = function (database) {
+      this.checkDatabaseHealth(database);
+      this.setStatements(database);
+      this.setRelations();
+      this.setRules(database);
     }
 
-    this.checkQuery = function (params) {
+    this.checkQuery = function(query){
+      parsed_query = this.parseQuery(query);
+      if(this.queryIsStatement(parsed_query)){
+        return this.verificateStatement(parsed_query);
+      }else {
+        return this.verificateRule(parsed_query);
+      }
+    }
+
+    this.verificateStatement = function(query){
+      let i;
+      for(i = 0; i < this.statements.length; i++){
+        if(this.statements[i].name == query.name
+        && this.arraysAreEqual(this.statements[i].params,query.params)){
         return true;
+        }
+      }
+      return false;
     }
+    this.parseQuery = function(query){
+      let aux = this.filterEmptyStrings(this.removeSpaces(query).split(/[(,)]/))
+      return new Relation(aux[0],aux.splice(1))
+    }
+
+    this.queryIsStatement = function(query){
+      let i;
+      for(i = 0; i<this.statements.length; i++){
+        if(this.statements[i].params.length == query.params.length
+        && this.statements[i].name == query.name){
+          return true;
+        }
+      }
+      return false;
+    }
+
+    this.setRelations = function(){
+      let i;
+      let relation_name = 0;
+      let aux = [];
+      for(i = 0; i<this.statements.length; i++){
+        aux.push(new Relation(this.statements[i][relation_name],this.statements[i].splice(1)));
+      }
+      this.statements = aux;
+    }
+
+
+    this.setStatements = function(database){
+      let i;
+      let aux = [];
+      for(i=0; i<database.length; i++){
+        if(this.databaseLineIsStatement(database[i])){
+          aux.push(database[i]);
+        }
+      }
+      this.statements = this.parseStatements(aux);
+    }
+    this.setRules = function(database){
+      let i;
+      let aux =[];
+      for(i=0; i<database.length; i++){
+        if(!this.databaseLineIsStatement(database[i])){
+          aux.push(database[i]);
+        }
+      }
+      this.rules = this.parseRules(aux);
+
+    }
+
+    this.filterEmptyStrings = function(array){
+      let i;
+      let aux =[];
+      for(i = 0;i<array.length;i++){
+        if(array[i]!='')
+          aux.push(array[i]);
+      }
+      return aux;
+    }
+
+
+
+    this.splitLine = function(line){
+      return line.split(/[(,)]/);
+    }
+    this.checkDatabaseHealth = function(database){
+      let i;
+      for(i = 0; i<database.length;i++){
+        if(this.databaseLineIsStatement(database[i])){
+          this.checkStatementHealth(database[i]);
+        }else {
+          this.checkRuleHealth(database[i]);
+        }
+      }
+      return true;
+    }
+    this.checkStatementHealth = function(line){
+      let statement_regex = /\w+\(\w+(, \w+)*\)\./
+      if(!line.match(statement_regex)){
+        throw new Error('Wrong Statement Format');
+      }
+    }
+    this.checkRuleHealth = function(line){
+      let statement_regex  = /\w+\(\w+(, \w+)*\)/
+      let dot_regex = / :- /
+      let rule_regex = new RegExp (statement_regex.source + dot_regex.source
+        + statement_regex.source + "(" + statement_regex.source + ")*\.")
+      if(!line.match(rule_regex)){
+        throw new Error('Wrong Rule Format');
+      }
+    }
+    this.checkQueryHealth = function(line){
+      let query_regex = /\w+\(\w+(, \w+)*\)\.*/
+      if(!line.match(query_regex)){
+        throw new Error('Wrong Query Format');
+      }
+    }
+
     this.removeStopAtTheEnd = function(entry){
       if(entry.indexOf(".") == -1)
         throw new Error("Missing Stop");
@@ -17,7 +144,8 @@ var Interpreter = function () {
       for(i = 0; i<entry.length; i++){
         let aux = entry[i];
         aux = this.removeStopAtTheEnd(aux);
-        entry[i] = aux.split(/[(,)]/);
+        aux = this.removeSpaces(aux);
+        entry[i] = this.filterEmptyStrings(this.splitLine(aux));
       }
       return entry;
     }
@@ -34,13 +162,14 @@ var Interpreter = function () {
       return true;
     }
     this.removeSpaces = function(entry){
-      return entry.replace(/[ ]/g,"")
+      return entry.replace(/\s+/g,"")
     }
     this.parseConditions = function(entry){
       return entry.split(":-");
     }
     this.insertConditionDivider = function(entry){
-      return entry.replace( /\),/g ,')|');
+      let condition_divider_regex = /\),/g;
+      return entry.replace( condition_divider_regex ,')|');
     }
     this.parseRules = function(entry){
       let i;
@@ -52,39 +181,21 @@ var Interpreter = function () {
       }
       return entry;
     }
-
-
-}
-// Warn if overriding existing method
-if(Array.prototype.equals)
-    console.warn("Overriding existing Array.prototype.equals. Possible causes: New API defines the method, there's a framework conflict or you've got double inclusions in your code.");
-// attach the .equals method to Array's prototype to call it on any array
-Array.prototype.equals = function (array) {
-    // if the other array is a falsy value, return
-    if (!array)
+    this.arraysAreEqual = function(array_a,array_b){
+      if(array_a.length != array_b.length || typeof(array_a) != typeof(array_b)){
         return false;
-
-    // compare lengths - can save a lot of time
-    if (this.length != array.length)
-        return false;
-
-    for (var i = 0, l=this.length; i < l; i++) {
-        // Check if we have nested arrays
-        if (this[i] instanceof Array && array[i] instanceof Array) {
-            // recurse into the nested arrays
-            if (!this[i].equals(array[i]))
-                return false;
-        }
-        else if (this[i] != array[i]) {
-            // Warning - two different object instances will never be equal: {x:20} != {x:20}
+      }
+      let i;
+      for(i = 0;i<array_a.length; i++){
+        if(typeof(array_a) == typeof(array_a[i])){
+          if(!this.arraysAreEqual(array_a[i],array_b[i])){
             return false;
+          }
+        }else if(array_a[i] != array_b[i]){
+          return false;
         }
+      }
+      return true;
     }
-    return true;
-}
-// Hide method from for-in loops
-Object.defineProperty(Array.prototype, "equals", {enumerable: false});
-function checkDatabaseInput(entry){
-
 }
 module.exports = Interpreter;
